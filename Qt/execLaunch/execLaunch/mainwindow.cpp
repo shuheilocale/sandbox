@@ -52,7 +52,7 @@ void MainWindow::on_pushButton_exec_clicked()
         }
         pats.push_back(pat);
     }
-    */
+
     std::vector< std::vector < Para > > paramList;
     for(int i = 0; i < ui->tableWidget_pre->rowCount(); i++){
         std::vector< Para > params;
@@ -64,6 +64,22 @@ void MainWindow::on_pushButton_exec_clicked()
         }
         paramList.push_back(params);
     }
+*/
+    _paramList.clear();
+
+    std::vector< RowPat > pats;
+    for(int i = 0; i < ui->tableWidget->rowCount(); i++){
+        RowPat pat;
+        pat.row = ui->tableWidget->item(i,0)->text().toInt();
+        QStringList patline = ui->tableWidget->item(i,1)->text().split(",");
+        foreach(QString str, patline){
+            pat.pattern.push_back(str.toStdString());
+        }
+        pats.push_back(pat);
+    }
+
+    std::vector< Para> params;
+    createPattern ( pats, params, 0);
 
 
     QFile paramFile(ui->lineEdit_parampath->text());
@@ -79,15 +95,15 @@ void MainWindow::on_pushButton_exec_clicked()
     }
     paramFile.close();
 
-    paramFile.rename("hogehoge");
+    //paramFile.rename("hogehoge");
 
     // パラメタの数
-    for(unsigned int i = 0; i < paramList.size(); i++){
+    for(unsigned int i = 0; i < _paramList.size(); i++){
         QStringList curList(orgList);
 
         //行数
-        for(unsigned int j = 0; j < paramList[i].size(); j++){
-            curList[paramList[i][j].row-1] = QString::fromStdString( paramList[i][j].para );
+        for(unsigned int j = 0; j < _paramList[i].size(); j++){
+            curList[_paramList[i][j].row-1] = QString::fromStdString( _paramList[i][j].para );
         }
 
 
@@ -127,43 +143,11 @@ void MainWindow::on_pushButton_exec_clicked()
 
 }
 
-void MainWindow::createPattern( const std::vector< RowPat >& pats , std::vector< Para>& paramList){
-
-    // 行
-    for(unsigned int i = 0; i < pats.size(); i++){
-
-        // 各行のパタン
-        for(unsigned int j = 0; j < pats[i].pattern.size(); j++){
-            Para p;
-            p.para = pats[i].pattern[j];
-            p.row = pats[i].row;
-            paramList.push_back(p);
-        }
-    }
-}
 
 
-// パラメタパタン追加
+// いらない
 void MainWindow::on_pushButton_addparam_2_clicked()
-{
-    ui->tableWidget->setColumnWidth(1, ui->tableWidget->width()-50);
-
-    QString where = ui->lineEdit_where->text();
-    QString what = ui->lineEdit_what->text();
-
-    ui->tableWidget->setRowCount(ui->tableWidget->rowCount()+1);
-
-    QTableWidgetItem* itemWhere = new QTableWidgetItem();
-    itemWhere->setText(where);
-    ui->tableWidget->setItem(ui->tableWidget->rowCount()-1, 0, itemWhere);
-
-    QTableWidgetItem* itemWhat = new QTableWidgetItem();
-    itemWhat->setText(what);
-    ui->tableWidget->setItem(ui->tableWidget->rowCount()-1, 1, itemWhat);
-
-    ui->lineEdit_what->setText("");
-
-}
+{}
 
 
 // exeパス選択
@@ -248,3 +232,80 @@ void MainWindow::on_pushButton_addparam_pre_clicked()
   　→OUTPUTフォルダ/指定エレメント/　に　OUTPUT内のファイルを入れる
 
 */
+
+void MainWindow::on_pushButton_addparam_clicked()
+{
+    ui->tableWidget->setColumnWidth(1, ui->tableWidget->width()-50);
+
+     QString where = ui->lineEdit_where->text();
+     QString what = ui->lineEdit_what->text();
+
+     ui->tableWidget->setRowCount(ui->tableWidget->rowCount()+1);
+
+     QTableWidgetItem* itemWhere = new QTableWidgetItem();
+     itemWhere->setText(where);
+     ui->tableWidget->setItem(ui->tableWidget->rowCount()-1, 0, itemWhere);
+
+     QTableWidgetItem* itemWhat = new QTableWidgetItem();
+     itemWhat->setText(what);
+     ui->tableWidget->setItem(ui->tableWidget->rowCount()-1, 1, itemWhat);
+
+     ui->lineEdit_what->setText("");
+     ui->lineEdit_where->setText("");
+     ui->lineEdit_where->setFocus();
+}
+
+// テスト用
+void MainWindow::on_pushButton_clicked()
+{
+    _paramList.clear();
+
+    std::vector< RowPat > pats;
+    for(int i = 0; i < ui->tableWidget->rowCount(); i++){
+        RowPat pat;
+        pat.row = ui->tableWidget->item(i,0)->text().toInt();
+        QStringList patline = ui->tableWidget->item(i,1)->text().split(",");
+        foreach(QString str, patline){
+            pat.pattern.push_back(str.toStdString());
+        }
+        pats.push_back(pat);
+    }
+
+    std::vector< Para> params;
+    createPattern ( pats, params, 0);
+
+
+    QMessageBox msg;
+    QString str(QString::fromUtf8("行目,　値\n"));
+    for(unsigned int i = 0; i < _paramList.size(); i++){
+        for(unsigned int j = 0; j < _paramList[i].size(); j++){
+            str += QString::number(_paramList[i][j].row) + "," + QString::fromStdString(_paramList[i][j].para) + "\n";
+        }
+        str += "----\n";
+    }
+    msg.setText(str);
+    msg.exec();
+}
+
+void MainWindow::createPattern( const std::vector< RowPat >& pats , std::vector< Para> params , unsigned depth){
+
+    // 下の行がある
+    if( pats.size() > depth){
+
+        // 各行のパタン
+        for(unsigned int j = 0; j < pats[depth].pattern.size(); j++){
+            std::vector< Para > para = params;
+            Para p;
+            p.para = pats[depth].pattern[j];
+            p.row = pats[depth].row;
+            para.push_back(p);
+            createPattern( pats, para, depth+1);
+        }
+
+    }
+    // 一番下の行
+    else{
+        _paramList.push_back(params);
+    }
+
+}

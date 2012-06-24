@@ -41,9 +41,14 @@ private slots:
 
     void on_pushButton_addparam_pre_clicked();
 
+    void on_pushButton_addparam_clicked();
+
+    void on_pushButton_clicked();
+
 private:
+    std::vector < std::vector< Para > > _paramList;
     Ui::MainWindow *ui;
-    void createPattern ( const std::vector< RowPat >& pats, std::vector< Para>& paramList);
+    void createPattern ( const std::vector< RowPat >& pats, std::vector< Para> params, unsigned depth);
 };
 
 #endif // MAINWINDOW_H
