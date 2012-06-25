@@ -27,8 +27,8 @@ public:
     ~FileTreeWidget();
 
     int openDir(QString path);
-    void dump(QFile& file);
-    QStringList toListText();
+    void dump(QFile& file, const bool& relate);
+    QStringList toListText(const bool& relate);
     QString root(){ return _rootDir->dirName(); }
 
     QIcon* _folderIcon;
@@ -45,13 +45,15 @@ private:
 
     void checksRecursive(QTreeWidgetItem* parent);
     void parentCheckRecursive(QTreeWidgetItem* parent);
-    void toListTextRecursive(QTreeWidgetItem* parent, QStringList& out);
+    void toListTextRecursive(QTreeWidgetItem* parent, QStringList& out, const bool& relate);
     void extFilterRecursive(QTreeWidgetItem* parent, const QStringList& extList);
     void depthFilterRecursive(QTreeWidgetItem* parent, int curDepth, const int& depth);
     void updateCheckStateRecursive(QTreeWidgetItem* parent);
 
     int _maxDepth;
 
+signals:
+    void loadFile(QString str);
 
 
 };

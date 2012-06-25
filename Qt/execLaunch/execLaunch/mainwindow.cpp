@@ -8,7 +8,10 @@
 #include <QTextStream>
 #include <QMessageBox>
 
+#include <QDebug>
+#include <QDateTime>
 
+//#define _SELF_
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -19,58 +22,67 @@ MainWindow::MainWindow(QWidget *parent) :
     // ヘッダ作成
     ui->tableWidget->setColumnCount(2);
     ui->tableWidget->setColumnWidth(0, 30);
-    ui->tableWidget->setColumnWidth(1, ui->tableWidget->width()-30);
+    ui->tableWidget->setColumnWidth(1, ui->tableWidget->width()-35);
     QStringList head;
     head.append(QString::fromUtf8("行目"));
     head.append(QString::fromUtf8("パラメタパタン"));
     ui->tableWidget->setHorizontalHeaderLabels(head);
 
+    _path.exe    = new QFileInfo;
+    _path.param  = new QFileInfo;
+    _path.output = new QDir;
+    _path.target = new QDir;
+    _path.ignore = new QDir;
+    _path.win    = new QDir;
 
+    QFile::exists("C:\\Program Files (x86)") ? ui->radioButton_7->setChecked(true) : ui->radioButton_XP->setChecked(true);
 
+    ui->pushButton_exec->setEnabled(false);
 }
 
 MainWindow::~MainWindow()
 {
+    delete _path.exe;
+    delete _path.param;
+    delete _path.output;
+    delete _path.target;
+    delete _path.ignore;
+    delete _path.win;
     delete ui;
 }
 
+// 実行
 void MainWindow::on_pushButton_exec_clicked()
 {
+
+    //初期化
+    // パスに全部入れる
+    _path.exe->setFile(ui->lineEdit_exepath->text());
+    _path.param->setFile(ui->lineEdit_parampath->text());
+    _path.output->setPath(_path.exe->dir().path() + "\\OUTPUT");
+    _path.target->setPath(_path.exe->dir().path() + QString::fromUtf8("\\MDGCHK\\指定エレメント"));
+    _path.ignore->setPath(_path.exe->dir().path() + QString::fromUtf8("\\MDGCHK\\除外エレメント"));
+    if(ui->radioButton_XP->isChecked())
+        _path.win->setPath(_path.exe->dir().path() + "\\OUTPUT\\WinXP");
+    else
+        _path.win->setPath(_path.exe->dir().path() + "\\OUTPUT\\Win7");
+
+  //  PathDeleter pd(&_path);
+
+
     ///////////
     // 前処理
     ///////////
-
-    // パラメタの組み合わせを作成
-    // 組み合わせを元にパラメタファイルを書き換え
-  /*  std::vector< RowPat > pats;
-    for(int i = 0; i < ui->tableWidget->rowCount(); i++){
-        RowPat pat;
-        pat.row = ui->tableWidget->item(i,0)->text().toInt();
-        QStringList patline = ui->tableWidget->item(i,1)->text().split(",");
-        foreach(QString str, patline){
-            pat.pattern.push_back(str.toStdString());
-        }
-        pats.push_back(pat);
-    }
-
-    std::vector< std::vector < Para > > paramList;
-    for(int i = 0; i < ui->tableWidget_pre->rowCount(); i++){
-        std::vector< Para > params;
-        for(int j = 0; j < ui->tableWidget_pre->columnCount(); j++){
-            Para pat;
-            pat.row = ui->tableWidget_pre->horizontalHeaderItem(j)->text().toInt();
-            pat.para = ui->tableWidget_pre->item(i,j)->text().toStdString();
-            params.push_back(pat);
-        }
-        paramList.push_back(params);
-    }
-*/
     _paramList.clear();
 
+    // パラメタテーブルからデータ構造に変換
     std::vector< RowPat > pats;
     for(int i = 0; i < ui->tableWidget->rowCount(); i++){
+        bool ok;
         RowPat pat;
-        pat.row = ui->tableWidget->item(i,0)->text().toInt();
+        pat.row = ui->tableWidget->item(i,0)->text().toInt(&ok);
+        if(!ok)
+            continue;
         QStringList patline = ui->tableWidget->item(i,1)->text().split(",");
         foreach(QString str, patline){
             pat.pattern.push_back(str.toStdString());
@@ -78,13 +90,16 @@ void MainWindow::on_pushButton_exec_clicked()
         pats.push_back(pat);
     }
 
+    // パタン作成　（_paramList）
     std::vector< Para> params;
     createPattern ( pats, params, 0);
 
 
-    QFile paramFile(ui->lineEdit_parampath->text());
-
+    // パラメータファイルを保持しておく
+    QFile paramFile(_path.param->absoluteFilePath());
+    qDebug() << "inParam : " << _path.param->absoluteFilePath();
     if (!paramFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        msg(QString::fromUtf8("パラメタファイルが開けません"));
         return;
     }
 
@@ -95,20 +110,28 @@ void MainWindow::on_pushButton_exec_clicked()
     }
     paramFile.close();
 
-    //paramFile.rename("hogehoge");
-
-    // パラメタの数
+    ///////////
+    // 実行
+    ///////////
+    // パラメタの数だけ実行
+    bool first = true;
     for(unsigned int i = 0; i < _paramList.size(); i++){
         QStringList curList(orgList);
+        QString patname;
 
-        //行数
+        //　パラメタファイルの作成
         for(unsigned int j = 0; j < _paramList[i].size(); j++){
             curList[_paramList[i][j].row-1] = QString::fromStdString( _paramList[i][j].para );
+
+            // パタン名
+            patname += QString::fromStdString( _paramList[i][j].para ) + ",";
         }
+        patname = patname.left(patname.length()-1) + QDateTime::currentDateTime().toString("_yyyyMMdd");
 
-
-        QFile outFile(ui->lineEdit_parampath->text() + QString::number(i));
+        QFile outFile(_path.param->absoluteFilePath());
+        qDebug() << "outParam : " << _path.param->absoluteFilePath();
         if (!outFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            msg(QString::fromUtf8("パラメタファイルに書き込めません"));
         }
 
         QTextStream out(&outFile);
@@ -116,39 +139,67 @@ void MainWindow::on_pushButton_exec_clicked()
             out << str << endl;
         }
         outFile.close();
+
+#ifndef _SELF_
+        // exe実行
+        QProcess proc;
+        QStringList arg;
+        arg.append("%CD%");
+        proc.execute(_path.exe->absoluteFilePath(), arg);
+#else
+        msg(QString::fromUtf8("exeを実行してください。\nexe完了後にOKを押してください。"));
+#endif
+
+        ///////////
+        // 後処理
+        ///////////
+
+        // OUTPUTファイルを移動
+        _path.output->mkdir(_path.win->dirName());
+        _path.win->mkdir(patname);
+
+        QFileInfoList outputList = _path.output->entryInfoList(QDir::Files);
+        foreach(QFileInfo fileInfo, outputList){
+            QFile file(fileInfo.absoluteFilePath());
+
+            // 初回でかつ、XXXXXX_YYYYYファイルなら
+            if(first && isXXXXXX_YYYYY(fileInfo.fileName()) ){
+                file.copy(_path.ignore->absolutePath() + "\\" + fileInfo.fileName());
+                file.copy(_path.target->absolutePath() + "\\" + fileInfo.fileName());
+            }
+            file.rename(_path.win->absolutePath() + "\\" + patname + "\\" + fileInfo.fileName());
+        }
+        first = false;
     }
 
-    ui->lineEdit_where_pre->setText("");
+    // パラメタファイルを元に戻す
+    QFile outFile(_path.param->absoluteFilePath());
+    if (!outFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        msg(QString::fromUtf8("パラメタファイルに書き込めません"));
+    }
+    QTextStream out(&outFile);
+    foreach(QString str, orgList){
+        out << str << endl;
+    }
+    outFile.close();
 
-    QMessageBox msg;
-    msg.setText(QString::fromUtf8("完了"));
-    msg.exec();
+    // 完了
+    msg(QString::fromUtf8("完了"));
 
     return;
 
-
-    ///////////
-    // 実行
-    ///////////
-    QProcess proc;
-    QStringList arg;
-    arg.append("%CD%");
-    proc.execute(ui->lineEdit_exepath->text(), arg);
-
-    ///////////
-    // 後処理
-    ///////////
-    ui->lineEdit_where->setEnabled(true);
-
-
 }
 
+bool MainWindow::isXXXXXX_YYYYY(QString str){
+    if(str.length() != QString("xxxxxx_yyyyy.txt").length())
+        return false;
 
-
-// いらない
-void MainWindow::on_pushButton_addparam_2_clicked()
-{}
-
+    QRegExp regExp("[0-9]{6}_[0-9]{5}.txt");
+    if( -1 == regExp.indexIn(str) )
+        return false;
+    else
+        return true;
+}
 
 // exeパス選択
 void MainWindow::on_pushButton_exepath_clicked()
@@ -179,60 +230,9 @@ void MainWindow::on_pushButton_param_clicked()
     }
 }
 
-// ログファイル選択
-void MainWindow::on_pushButton_logpath_clicked()
-{
-    QString strFName = QFileDialog::getOpenFileName(
-            this,
-            QString::fromUtf8("ログファイル"),
-            ".",
-            tr( "log (*.*)" ) );
-    if ( !strFName.isEmpty() )
-    {
-        ui->lineEdit_parampath->setText(strFName);
-    }
-}
-
-void MainWindow::on_pushButton_addparam_pre_clicked()
-{
-
-    if( ui->lineEdit_what_pre->text().isEmpty() )
-        return;
-
-    QStringList whats = ui->lineEdit_what_pre->text().split(",");
-    QStringList wheres = ui->lineEdit_where_pre->text().split(",");
-
-    ui->tableWidget_pre->setColumnCount(wheres.size());
-    ui->tableWidget_pre->setHorizontalHeaderLabels(wheres);
-    ui->tableWidget_pre->setRowCount(ui->tableWidget_pre->rowCount()+1);
-    for(int i = 0; i< whats.size(); i++){
-        ui->tableWidget_pre->setColumnWidth(i,30);
-        QTableWidgetItem* item = new QTableWidgetItem();
-        item->setText(whats[i]);
-        ui->tableWidget_pre->setItem(ui->tableWidget_pre->rowCount()-1,i,item);
-    }
-
-    ui->lineEdit_where_pre->setEnabled(false);
-    ui->lineEdit_what_pre->setText("");
-}
 
 
-/*
-  出力
-  ・ログファイル
-　  →OUTPUT/ *** .log
-  　→使った後にどうする？
-  ・OUTPUTフォルダ
-    →0.0.0_YYYYMMDD にリネームして、どこにおいておく？
-  ・パラメタファイル
-  　→使ったあとに、どうする？
-  ・除外エレメント
-    →OUTPUTフォルダ/除外エレメント/　に OUTPUT内のファイルを入れる
-  ・指定エレメント
-  　→OUTPUTフォルダ/指定エレメント/　に　OUTPUT内のファイルを入れる
-
-*/
-
+// パラメタ追加
 void MainWindow::on_pushButton_addparam_clicked()
 {
     ui->tableWidget->setColumnWidth(1, ui->tableWidget->width()-50);
@@ -253,39 +253,10 @@ void MainWindow::on_pushButton_addparam_clicked()
      ui->lineEdit_what->setText("");
      ui->lineEdit_where->setText("");
      ui->lineEdit_where->setFocus();
+     ui->pushButton_exec->setEnabled(true);
 }
 
-// テスト用
-void MainWindow::on_pushButton_clicked()
-{
-    _paramList.clear();
 
-    std::vector< RowPat > pats;
-    for(int i = 0; i < ui->tableWidget->rowCount(); i++){
-        RowPat pat;
-        pat.row = ui->tableWidget->item(i,0)->text().toInt();
-        QStringList patline = ui->tableWidget->item(i,1)->text().split(",");
-        foreach(QString str, patline){
-            pat.pattern.push_back(str.toStdString());
-        }
-        pats.push_back(pat);
-    }
-
-    std::vector< Para> params;
-    createPattern ( pats, params, 0);
-
-
-    QMessageBox msg;
-    QString str(QString::fromUtf8("行目,　値\n"));
-    for(unsigned int i = 0; i < _paramList.size(); i++){
-        for(unsigned int j = 0; j < _paramList[i].size(); j++){
-            str += QString::number(_paramList[i][j].row) + "," + QString::fromStdString(_paramList[i][j].para) + "\n";
-        }
-        str += "----\n";
-    }
-    msg.setText(str);
-    msg.exec();
-}
 
 void MainWindow::createPattern( const std::vector< RowPat >& pats , std::vector< Para> params , unsigned depth){
 

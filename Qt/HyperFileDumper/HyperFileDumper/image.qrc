@@ -5,5 +5,7 @@
         <file>image/Open.png</file>
         <file>image/Save.png</file>
         <file>image/Print.png</file>
+        <file>image/Info.png</file>
+        <file>image/Settings.png</file>
     </qresource>
 </RCC>

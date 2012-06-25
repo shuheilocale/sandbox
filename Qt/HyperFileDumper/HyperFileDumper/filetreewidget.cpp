@@ -64,13 +64,16 @@ FileTreeWidget::~FileTreeWidget(){
 
 void FileTreeWidget::crawlDirectory(QDir* parentDir, QTreeWidgetItem* parentItem, int depth, QList<int>& depthList ){
 
-    QFileInfoList fileList = parentDir->entryInfoList();
+
+    QFileInfoList fileList = parentDir->entryInfoList(QDir::NoFilter, QDir::DirsFirst);
 
     foreach(QFileInfo fileInfo, fileList){
         depthList.append(depth+1);
 
         if( fileInfo.fileName() == "." || fileInfo.fileName() == ".." )
             continue;
+
+        emit loadFile(fileInfo.absoluteFilePath());
 
         QTreeWidgetItem* childItem = new QTreeWidgetItem();
         childItem->setText(0, fileInfo.fileName());
@@ -189,10 +192,10 @@ void FileTreeWidget::parentCheckRecursive(QTreeWidgetItem* item){
 
 
 // ファイル出力
-void FileTreeWidget::dump(QFile& file){
+void FileTreeWidget::dump(QFile& file, const bool& relate){
 
     QTextStream out(&file);
-    foreach(QString strline, this->toListText()){
+    foreach(QString strline, this->toListText(relate)){
         out << strline << endl;
     }
 
@@ -202,19 +205,21 @@ void FileTreeWidget::dump(QFile& file){
 
 
 // プレビュー
-QStringList FileTreeWidget::toListText(){
+QStringList FileTreeWidget::toListText(const bool& relate){
 
     QStringList out;
 
-    if( this->topLevelItem(0)->checkState(0) != Qt::Unchecked )
+    if( this->topLevelItem(0)->checkState(0) != Qt::Unchecked && relate)
         out.append( this->topLevelItem(0)->text(ftw::path) + QString(" = %1").arg(this->topLevelItem(0)->text(ftw::name)) );
+    else if(this->topLevelItem(0)->checkState(0) != Qt::Unchecked && !relate)
+        out.append( this->topLevelItem(0)->text(ftw::abs_path) );
 
-    this->toListTextRecursive(this->topLevelItem(0), out);
+    this->toListTextRecursive(this->topLevelItem(0), out, relate);
 
     return out;
 }
 
-void FileTreeWidget::toListTextRecursive(QTreeWidgetItem* parent, QStringList& out){
+void FileTreeWidget::toListTextRecursive(QTreeWidgetItem* parent, QStringList& out, const bool& relate){
 
     // 子チェック
     bool nothing = true;
@@ -230,7 +235,10 @@ void FileTreeWidget::toListTextRecursive(QTreeWidgetItem* parent, QStringList& o
     out.append("");
 
     // 親のパスを出力
-    out.append(parent->text(ftw::path) );
+    if(relate)
+        out.append(parent->text(ftw::path) );
+    else
+        out.append(parent->text(ftw::abs_path) );
 
     // 子のパスを出力
     for(int cnt = 0; cnt < parent->childCount(); cnt++ ){
@@ -247,17 +255,23 @@ void FileTreeWidget::toListTextRecursive(QTreeWidgetItem* parent, QStringList& o
     // 子の中にディレクトリが存在したら再帰
     for(int cnt = 0; cnt < parent->childCount(); cnt++){
         if(parent->child(cnt)->childCount() && parent->child(cnt)->checkState(0) != Qt::Unchecked ){
-            this->toListTextRecursive(parent->child(cnt), out);
+            this->toListTextRecursive(parent->child(cnt), out, relate);
         }
     }
 }
 
 void FileTreeWidget::doFiltering(int depth, QStringList extList){
+
+    if(!depth){
+        this->topLevelItem(0)->setCheckState(0, Qt::Unchecked);
+    }
     disconnect(this, SIGNAL(itemChanged(QTreeWidgetItem*, int)),
             this, SLOT(updateChecks(QTreeWidgetItem*, int)));
 
-    // 階層フィルタをカマス
-    this->depthFilterRecursive(this->topLevelItem(0), 0, depth);
+    if(depth){
+        // 階層フィルタをカマス
+        this->depthFilterRecursive(this->topLevelItem(0), 0, depth);
+    }
 
     // 拡張子フィルタをカマス
     this->extFilterRecursive(this->topLevelItem(0), extList);
@@ -275,6 +289,7 @@ void FileTreeWidget::depthFilterRecursive(QTreeWidgetItem *parent, int curDepth,
     {
         if( curDepth+1 >= depth )
             parent->child(i)->setCheckState(0, Qt::Unchecked);
+
         depthFilterRecursive(parent->child(i), curDepth+1, depth);
     }
 }

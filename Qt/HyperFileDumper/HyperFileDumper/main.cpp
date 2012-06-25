@@ -2,9 +2,6 @@
 #include "mainwindow.h"
 #include "filetreewidget.h"
 
-
-void addChildren(QTreeWidgetItem* item,QString filePath);
-
 int main(int argc, char *argv[])
 {
     

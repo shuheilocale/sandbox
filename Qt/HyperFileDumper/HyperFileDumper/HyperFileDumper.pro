@@ -13,11 +13,13 @@ TEMPLATE = app
 SOURCES += main.cpp\
         mainwindow.cpp \
     filetreewidget.cpp \
-    filterwidget.cpp
+    filterwidget.cpp \
+    settingswindow.cpp
 
 HEADERS  += mainwindow.h \
     filterwidget.h \
-    filetreewidget.h
+    filetreewidget.h \
+    settingswindow.h
 
 FORMS    +=
 
