@@ -126,7 +126,7 @@ void MainWindow::on_pushButton_exec_clicked()
             // パタン名
             patname += QString::fromStdString( _paramList[i][j].para ) + ",";
         }
-        patname = patname.left(patname.length()-1) + QDateTime::currentDateTime().toString("_yyyyMMdd");
+        patname = patname.left(patname.length()-1);
 
         QFile outFile(_path.param->absoluteFilePath());
         qDebug() << "outParam : " << _path.param->absoluteFilePath();
@@ -155,11 +155,24 @@ void MainWindow::on_pushButton_exec_clicked()
         ///////////
 
         // OUTPUTファイルを移動
+        QFileInfoList dateDirList = _path.output->entryInfoList(QDir::Dirs);
+        QDir dateDir;
+        foreach(QFileInfo fileInfo, dateDirList){
+            if(fileInfo.fileName().contains(QRegExp("[0-9]{4}_[0-9]{2}_[0-9]{2}"))){
+                dateDir.cd(fileInfo.filePath());
+                break;
+            }
+        }
+
+
+        // winパスを作る
         _path.output->mkdir(_path.win->dirName());
+        // パタンディレクトリを作る(_日付)
+        patname += "_" + dateDir.dirName();
         _path.win->mkdir(patname);
 
-        QFileInfoList outputList = _path.output->entryInfoList(QDir::Files);
-        foreach(QFileInfo fileInfo, outputList){
+        QFileInfoList dateDirFileList = dateDir.entryInfoList(QDir::Files);
+        foreach(QFileInfo fileInfo, dateDirFileList){
             QFile file(fileInfo.absoluteFilePath());
 
             // 初回でかつ、XXXXXX_YYYYYファイルなら
@@ -170,6 +183,20 @@ void MainWindow::on_pushButton_exec_clicked()
             file.rename(_path.win->absolutePath() + "\\" + patname + "\\" + fileInfo.fileName());
         }
         first = false;
+
+        // 日付フォルダを消す
+        _path.output->rmdir(dateDir.dirName());
+
+
+        // ログファイル
+        QFileInfoList execDirList = _path.exe->absoluteDir().entryInfoList(QDir::Files);
+        foreach(QFileInfo fileInfo, execDirList){
+            if(fileInfo.suffix() == "log"){
+                QFile file(fileInfo.absoluteFilePath());
+                file.rename(_path.win->absolutePath() + "\\" + patname + "\\" + fileInfo.fileName());
+                break;
+            }
+        }
     }
 
     // パラメタファイルを元に戻す
@@ -200,6 +227,8 @@ bool MainWindow::isXXXXXX_YYYYY(QString str){
     else
         return true;
 }
+
+
 
 // exeパス選択
 void MainWindow::on_pushButton_exepath_clicked()
